@@ -3,11 +3,13 @@ package com.example.rmeysa.cookbookversion2;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -20,12 +22,21 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Base64;
+import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.TableLayout;
+import android.widget.TableRow;
 import android.widget.Toast;
 
 import java.io.File;
@@ -39,6 +50,7 @@ import java.util.List;
 public class EditRecipe extends AppCompatActivity {
     DatabaseHelper db;
     List<Recipe> recipeList;
+    List<Ingredient> ingredientList;
     EditText recipe_name_edit;
     EditText preparation_edit;
     ImageButton CameraButton;
@@ -51,10 +63,23 @@ public class EditRecipe extends AppCompatActivity {
     private Uri imageURI;
     private static final int REQUEST_STORAGE_PERMISSION = 1;
     private static final int PICTURE_REQUEST_CODE = 1;
+
+
+    Button btnAdd;
+    EditText ingredientsName;
+    LinearLayout linearLayout;
+    private static TableLayout ingredient_table;
+    private static TableRow ing_row;
+    private static EditText ingredient_edittext;
+    public static ArrayList<String> ingredientsArray;
+    private Cursor cursorIngredients;
+    public static  List<Ingredient> ingArrList;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_edit_recipe);
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
         db = new DatabaseHelper(this);
 
@@ -62,8 +87,84 @@ public class EditRecipe extends AppCompatActivity {
         final int keyFromBundle = Integer.parseInt(bundle.getString("recipe_id"));
 
 
+
         recipeList = new ArrayList<>();
         recipeList = db.getAllRecipeList();
+
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        linearLayout = (LinearLayout) findViewById(R.id.layout_ingredient_edit);
+        ingredientsName = (EditText) findViewById(R.id.editText_ingredient_edit);
+        btnAdd = (Button) findViewById(R.id.btn_ing_edit);
+        ingredient_table = (TableLayout) findViewById(R.id.ing_table_edit);
+
+        ingredientsArray = new ArrayList<String>();
+        getIngredients(recipeList.get(keyFromBundle-1).getRecipe_id());
+        ingArrList = new ArrayList<>();
+        ingArrList=db.getIngredientsByRcId(recipeList.get(keyFromBundle-1).getRecipe_id());
+
+        for(int i=0; i<ingredientsArray.size(); i++){
+            ing_row = new TableRow(EditRecipe.this);
+            ingredient_edittext = new EditText(EditRecipe.this);
+
+            Button remove = new Button(EditRecipe.this);
+            remove.setText("-");
+            final int j = i;
+
+            remove.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+
+                    View row = (View) v.getParent();
+                    ingredient_table = ((TableLayout) row.getParent());
+                    ingredient_table.removeView(row);
+                    db.deleteIngredient(ingArrList.get(j).getIngredientId());
+
+                }
+            });
+
+            ingredient_edittext.setText(ingredientsArray.get(i));
+            ingredient_table.addView(ing_row);
+            ing_row.addView(remove);
+            ing_row.addView(ingredient_edittext);
+        }
+
+        btnAdd.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                final String ingredientToAdd = ingredientsName.getText().toString();
+                if (ingredientToAdd.matches("")) {
+                    Message("Enter an ingredient");
+                } else {
+                    ing_row = new TableRow(EditRecipe.this);
+                    ingredient_edittext = new EditText(EditRecipe.this);
+                    addIngredient(ingredientToAdd, recipeList.get(keyFromBundle-1).getRecipe_id());
+                    ingArrList=db.getIngredientsByRcId(recipeList.get(keyFromBundle-1).getRecipe_id());
+                    Button remove = new Button(EditRecipe.this);
+                    remove.setText("-");
+
+                    remove.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            View row = (View) v.getParent();
+                            ingredient_table = ((TableLayout) row.getParent());
+                            ingredient_table.removeView(row);
+                            db.deleteIngredient(findIngID(ingredientToAdd,ingArrList));
+
+                        }
+                    });
+
+                    ingredient_edittext.setText(ingredientToAdd);
+                    ingredient_table.addView(ing_row);
+                    ing_row.addView(remove);
+                    ing_row.addView(ingredient_edittext);
+                    Log.e("Bu ingredient eklendi :", ingredientToAdd);
+                    ingredientsName.setText("");
+                }
+            }
+        });
+
+
         long day = System.currentTimeMillis();
         date = new SimpleDateFormat("dd/MM/yyyy").format(new Date(day));
 
@@ -76,26 +177,30 @@ public class EditRecipe extends AppCompatActivity {
         preparation_edit.setText(recipeList.get(keyFromBundle-1).getPreparation());
         edit_text_input.setText(String.valueOf(recipeList.get(keyFromBundle-1).getCookingTime()));
         image_uri_db = recipeList.get(keyFromBundle-1).getImageURL();
-        if( uri != null) {
             InputStream inputStream = null;
-            uri = Uri.parse(image_uri_db);
 
-        try {
-            inputStream = getContentResolver().openInputStream(uri);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-        bitmap = BitmapFactory.decodeStream(inputStream);
-        CameraButton.setImageBitmap(bitmap);
-        } else{
-            Message("Uri is null");
-        }
+            if(image_uri_db!=null){
+                uri = Uri.parse(image_uri_db);
+            }
+            else{
+                uri = Uri.parse("R.mipmap.ic_launcher_broken_image_round.png");
+                Message(image_uri_db);
+            }
+
+            try {
+                inputStream = getContentResolver().openInputStream(uri);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+            bitmap = BitmapFactory.decodeStream(inputStream);
+            CameraButton.setImageBitmap(bitmap);
+            CameraButton.setRotation(90);
 
         CameraButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 ChooseSource();
-                }
+            }
         });
 
     }
@@ -111,7 +216,6 @@ public class EditRecipe extends AppCompatActivity {
 
         }
     }
-
 
     public void ChooseSource() {
 
@@ -179,6 +283,7 @@ public class EditRecipe extends AppCompatActivity {
                     inputStream = getContentResolver().openInputStream(uri);
                     bitmap = BitmapFactory.decodeStream(inputStream);
                     CameraButton.setImageBitmap(bitmap);
+                    CameraButton.setRotation(90);
 
                 } catch (FileNotFoundException e) {
                     e.printStackTrace();
@@ -204,14 +309,18 @@ public class EditRecipe extends AppCompatActivity {
         EditText edit_text_input =(EditText) findViewById(R.id.edit_text_input);
         String str_edit = edit_text_input.getText().toString();       //this will get a string
         int int_edit = Integer.parseInt(str_edit);
-        uri_to_str = uri.toString();
+
+        if(uri!=null){
+            uri_to_str = uri.toString();
+        }
+
         switch (item.getItemId()){
             case R.id.delete:
                 createAlert(recipeList.get(keyFromBundle-1).getRecipe_id());
                 break;
             case R.id.save:
-                db.updateRecipe(recipeList.get(keyFromBundle-1).getRecipe_id(), recipe_name_edit.getText().toString(),
-                        preparation_edit.getText().toString(),int_edit, uri_to_str,date);
+                db.updateRecipe(recipeList.get(keyFromBundle-1).getRecipe_id(), recipe_name_edit.getText().toString().toUpperCase(),
+                        preparation_edit.getText().toString(),int_edit,date, uri_to_str);
                 Intent intentNewRecipe = new Intent(this, MainActivity.class);
                 startActivity(intentNewRecipe);
         }
@@ -245,6 +354,47 @@ public class EditRecipe extends AppCompatActivity {
     }
     private void Message(String message){
         Toast.makeText(this,message, Toast.LENGTH_SHORT).show();
+    }
+
+    public void getIngredients(int recId) {
+
+        db = new DatabaseHelper(this);
+        cursorIngredients = db.getRecipeDetailIngredients(recId);
+        String ingredientsName;
+        if (cursorIngredients.moveToFirst()) {
+            do {
+                ingredientsName = cursorIngredients.getString(0);
+                Ingredient ingredients = new Ingredient(ingredientsName);
+                String list = ingredients.getIngredientName();
+                ingredientsArray.add(list);
+
+            } while (cursorIngredients.moveToNext());
+        }
+
+        if (ingredientsArray.isEmpty()) {
+            ingredientsArray.add("didnt added");
+
+        }
+
+    }
+
+    public void addIngredient(String ingredientToAdd, int recId) {
+
+        db = new DatabaseHelper(this);
+        db.addIngredients(ingredientToAdd, recId);
+        db.close();
+
+    }
+
+    public int findIngID(String name, List<Ingredient> list){
+        int id=0;
+        for(int i=0; i<list.size(); i++){
+            if(list.get(i).getIngredientName().equals(name)){
+                id= list.get(i).getIngredientId();
+            }
+
+        }
+        return id;
     }
 }
 

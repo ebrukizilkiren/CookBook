@@ -6,6 +6,8 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,13 +25,10 @@ public class DatabaseHelper extends SQLiteOpenHelper{
     private final static String ING_ID = "ing_id";
     private final static String ING_NAME = "ing_name";
     private final static String REC_ID = "fk_recipe_id";
-    private final static String CHECK_VALUE = "check_value";
-
-
 
 
     public DatabaseHelper(Context context) {
-        super(context, "fejf", null, 1); /**/
+        super(context, "cookbook_database", null, 1); /**/
     }
 
     @Override
@@ -42,13 +41,13 @@ public class DatabaseHelper extends SQLiteOpenHelper{
         String CREATE_INGREDIENTS_TABLE = "CREATE TABLE " + TABLE_NAME_ING +"("
                 + ING_ID + " INTEGER UNIQUE PRIMARY KEY AUTOINCREMENT,"
                 + ING_NAME + " TEXT,"
-                + REC_ID + " INTEGER," + CHECK_VALUE + " INTEGER);";
+                + REC_ID + " INTEGER);";
 
         db.execSQL(CREATE_RECIPE_TABLE);
         db.execSQL(CREATE_INGREDIENTS_TABLE);
 
-        db.delete(TABLE_NAME, null, null);
-        db.delete(TABLE_NAME_ING, null, null);
+        //db.delete(TABLE_NAME, null, null);
+        //db.delete(TABLE_NAME_ING, null, null);
     }
 
     @Override
@@ -76,10 +75,18 @@ public class DatabaseHelper extends SQLiteOpenHelper{
         values.put(ING_ID, ingredient.getIngredientId());
         values.put(ING_NAME, ingredient.getIngredientName());
         values.put(REC_ID, ingredient.getRecipeId());
-        values.put(CHECK_VALUE, ingredient.isChecked());
         db.insert(TABLE_NAME_ING,null,values);
         db.close();
 
+    }
+    public void addIngredients(String ingredientsName, int recipeId){
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(ING_NAME, ingredientsName);
+        values.put(REC_ID, recipeId);
+
+        db.insert(TABLE_NAME_ING, null, values);
+        Log.e("DATABASE OPERATIONS", "1 ingredient added for " + recipeId);
     }
 
     public boolean updateRecipe(int recipe_id, String recipe_name, String preparation,int time, String date, String imageURL) {
@@ -95,25 +102,24 @@ public class DatabaseHelper extends SQLiteOpenHelper{
         return db.update(TABLE_NAME, args, KEY_ID + "=" + recipe_id, null) > 0;
     }
 
-    public boolean updateIngredient(int ingId, String name, int recId, boolean checkValue){
+    public boolean updateIngredient(int ingId, String name, int recId){
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues args = new ContentValues();
         args.put(ING_ID, ingId);
         args.put(ING_NAME, name);
         args.put(REC_ID, recId);
-        args.put(CHECK_VALUE, checkValue);
 
-        return db.update(TABLE_NAME_ING, args, ING_ID + "=" + ingId, null) > 0;
+        return db.update(TABLE_NAME_ING, args, ING_ID + " = " + ingId, null) > 0;
     }
 
     public boolean deleteRecipe(int id){
         SQLiteDatabase db = this.getWritableDatabase();
-        return db.delete(TABLE_NAME, KEY_ID + "=" + id, null) > 0;
+        return db.delete(TABLE_NAME, KEY_ID + " = " + id, null) > 0;
     }
 
     public boolean deleteIngredient(int id){
         SQLiteDatabase db = this.getWritableDatabase();
-        return db.delete(TABLE_NAME_ING, ING_ID + "=" + id, null) > 0;
+        return db.delete(TABLE_NAME_ING, ING_ID + " = " + id, null) > 0;
     }
 
     public List<Recipe> getAllRecipeList() {
@@ -139,23 +145,64 @@ public class DatabaseHelper extends SQLiteOpenHelper{
         return recipeList;
     }
 
-    public List<Ingredient> getAllIngredients() {
+
+    public List<Ingredient> getAllIngredientsByRecipeId(int rcId) {
         List<Ingredient> ingredientList = new ArrayList<>();
-        String selectQuery = "SELECT  * FROM " + TABLE_NAME_ING;
+        String selectQuery = "Select * FROM " + TABLE_NAME + "," + TABLE_NAME_ING + " WHERE " + REC_ID + " = " +
+                KEY_ID + " AND " + REC_ID + " = " + rcId ;
+
         SQLiteDatabase db = this.getWritableDatabase();
         Cursor cursor = db.rawQuery(selectQuery, null);
         if (cursor.moveToFirst()) {
             do {
                 Ingredient ingredient = new Ingredient();
-                ingredient.setIngredientId(Integer.parseInt(cursor.getString(0)));
+                ingredient.setIngredientId(cursor.getInt(0));
                 ingredient.setIngredientName(cursor.getString(1));
-                ingredient.setRecipeId(Integer.parseInt(cursor.getString(2)));
-                if(Integer.parseInt(cursor.getString(3))>=1){
-                    ingredient.setCheckValue(true);
-                }else{
-                    ingredient.setCheckValue(false);
-                }
+                ingredient.setRecipeId(cursor.getInt(2));
+                ingredientList.add(ingredient);
+            } while (cursor.moveToNext());
+        }
+        return ingredientList;
+    }
 
+    public List<Ingredient> getAllIngredients() {
+        List<Ingredient> ingredientList = new ArrayList<>();
+        String selectQuery = "Select  * FROM " + TABLE_NAME + "," + TABLE_NAME_ING + " WHERE " + REC_ID + " = " +
+                KEY_ID  ;
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor = db.rawQuery(selectQuery, null);
+        if (cursor.moveToFirst()) {
+            do {
+                Ingredient ingredient = new Ingredient();
+                ingredient.setIngredientId(cursor.getInt(0));
+                ingredient.setIngredientName(cursor.getString(1));
+                ingredient.setRecipeId(cursor.getInt(2));
+                ingredientList.add(ingredient);
+            } while (cursor.moveToNext());
+        }
+        return ingredientList;
+    }
+    public Cursor getRecipeDetailIngredients(int id){
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor = db.rawQuery("Select  " + ING_NAME +
+                " FROM " + TABLE_NAME_ING + " , " + TABLE_NAME + " where " +
+                REC_ID + " = " + KEY_ID + " AND " +  REC_ID + " = " + id , null);
+        return cursor;
+    }
+
+
+    public List<Ingredient> getIngredientsByRcId(int recId) {
+        List<Ingredient> ingredientList = new ArrayList<>();
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor = db.rawQuery("Select  * FROM " + TABLE_NAME_ING + " , " + TABLE_NAME + " where " +
+                REC_ID + " = " + KEY_ID + " AND " +  REC_ID + " = " + recId , null);
+        if (cursor.moveToFirst()) {
+            do {
+                Ingredient ingredient = new Ingredient();
+                ingredient.setIngredientId(cursor.getInt(0));
+                ingredient.setIngredientName(cursor.getString(1));
+                ingredient.setRecipeId(cursor.getInt(2));
                 ingredientList.add(ingredient);
             } while (cursor.moveToNext());
         }
@@ -163,5 +210,23 @@ public class DatabaseHelper extends SQLiteOpenHelper{
     }
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

@@ -1,6 +1,5 @@
 package com.example.rmeysa.cookbookversion2;
 
-import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -14,8 +13,6 @@ import android.os.Environment;
 import android.os.Parcelable;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -24,14 +21,12 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.TextView;
+import android.widget.TableLayout;
+import android.widget.TableRow;
 import android.widget.Toast;
 
 import java.io.File;
@@ -56,55 +51,60 @@ public class AddRecipe extends AppCompatActivity {
     private static final int REQUEST_STORAGE_PERMISSION = 1;
     private static final int PICTURE_REQUEST_CODE = 1;
 
-    EditText editTextIngredient;
-    private LinearLayout parenLayout;
-    Button add_ing;
-    Button remove;
-    CheckBox check_box;
+    Button btnAdd;
+    EditText ingredientsName;
+    LinearLayout linearLayout;
+    private ArrayList<String> array_ingredient = new ArrayList<String>();
+    private static TableLayout ingredient_table;
+    private static TableRow ing_row;
+    private static EditText ingredient_edittext;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_recipe);
+        db = new DatabaseHelper(this);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        linearLayout = (LinearLayout) findViewById(R.id.layout_ingredient);
+        ingredientsName = (EditText) findViewById(R.id.editText_ingredient);
+        btnAdd = (Button) findViewById(R.id.btn_ing);
+        ingredient_table = (TableLayout) findViewById(R.id.ingredient_table);
 
-        add_ing = (Button) findViewById(R.id.btnAdd);
-        remove = new Button(AddRecipe.this);
-        editTextIngredient = (EditText) findViewById(R.id.txtItem);
-        parenLayout = (LinearLayout) findViewById(R.id.parent_layout);
+        btnAdd.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String ingredientToAdd = ingredientsName.getText().toString();
+                if (ingredientToAdd.matches("")) {
+                    Message("Enter an ingredient");
+                } else {
+                    ing_row = new TableRow(AddRecipe.this);
+                    ingredient_edittext = new EditText(AddRecipe.this);
 
+                    Button remove = new Button(AddRecipe.this);
+                    remove.setText("-");
 
-       add_ing.setOnClickListener(new View.OnClickListener() {
-           @Override
-           public void onClick(View v) {
-               String editTextIngredient_Str = editTextIngredient.getText().toString();
-               if (editTextIngredient_Str != null) {
-                   parenLayout.setOrientation(LinearLayout.VERTICAL);
-                   LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-                   final View rowView = inflater.inflate(R.layout.row, null);
-                   check_box = (CheckBox) rowView.findViewById(R.id.checkBox);
-                   check_box.setText(editTextIngredient.getText().toString());
-                   remove = (Button) rowView.findViewById(R.id.delete);
-                   parenLayout.addView(rowView, parenLayout.getChildCount() - 1);
-                   editTextIngredient.setText("");
-               } else {
-                   Message("Add an ingredient");
-               }
+                    remove.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            View row = (View) v.getParent();
+                            ingredient_table = ((TableLayout) row.getParent());
+                            ingredient_table.removeView(row);
+                        }
+                    });
 
-               remove.setOnClickListener(new View.OnClickListener() {
-                   @Override
-                   public void onClick(View v) {
-                       parenLayout.removeView((View) v.getParent());
-
-                   }
-               });
-
-           }
-       });
+                    ingredient_edittext.setText(ingredientToAdd);
+                    ingredient_table.addView(ing_row);
+                    ing_row.addView(remove);
+                    ing_row.addView(ingredient_edittext);
+                    Log.e("Bu ingredient eklendi :", ingredientToAdd);
+                    ingredientsName.setText("");
+                }
+            }
+        });
 
         CameraButton = findViewById(R.id.camera_button);
 
-        db = new DatabaseHelper(this);
+
         recipeList = new ArrayList<>();
         recipeList = db.getAllRecipeList();
 
@@ -121,6 +121,14 @@ public class AddRecipe extends AppCompatActivity {
 
 
     }
+    public void addIngredient(String ingredientToAdd) {
+
+        db = new DatabaseHelper(this);
+        db.addIngredients(ingredientToAdd, recipeList.size());
+        db.close();
+
+    }
+
 
     //----------------Camera-----------------------//
     @Override
@@ -206,6 +214,7 @@ public class AddRecipe extends AppCompatActivity {
             }
 
         } else {
+            uri = Uri.parse("R.mipmap.ic_launcher_broken_image_round.png");
             Message("RESULT CANCEL");
 
         }
@@ -241,27 +250,41 @@ public class AddRecipe extends AppCompatActivity {
                     Message("Recipe Name or Preparation part is empty");
                 }
                 else {
-                        if(!recipeList.isEmpty()){
-                            db.addNewRecipe(new Recipe(recipeList.size(), recipe_name_edit.getText().toString(), preparation_edit.getText().toString(),int_edit,date,uri_to_str));
+                            db.addNewRecipe(new Recipe(recipeList.size(), recipe_name_edit.getText().toString().toUpperCase(), preparation_edit.getText().toString(),int_edit,date,uri_to_str));
                             SharedPreferences mypreference_image= getSharedPreferences("mypreference", MODE_PRIVATE);
                             SharedPreferences.Editor editor = mypreference_image.edit();
                                 editor.putString("bitmap",uri_to_str);
                                 editor.apply();
+
+                    for (int i = 0; i <= ingredient_table.getChildCount(); i++) {
+                        View viewChild = ingredient_table.getChildAt(i);
+                        if (viewChild instanceof TableRow) {
+                            int rowChildParts = ((TableRow) viewChild).getChildCount();
+                            for (int j = 0; j < rowChildParts; j++) {
+                                View viewChild2 = ((TableRow) viewChild).getChildAt(j);
+                                if (viewChild2 instanceof EditText) {
+                                    String ingredients = ((EditText) viewChild2).getText().toString();
+                                    array_ingredient.add(ingredients);
+                                    addIngredient(ingredients);
+                                }
+                            }
                         }
-                        else{
-                            db.addNewRecipe(new Recipe(recipeList.size(), recipe_name_edit.getText().toString(), preparation_edit.getText().toString(),int_edit,date,uri_to_str));
-                            SharedPreferences mypreference_image= getSharedPreferences("mypreference", MODE_PRIVATE);
-                            SharedPreferences.Editor editor = mypreference_image.edit();
-                            editor.putString("bitmap",uri_to_str);
-                            editor.apply();
-                        }
+                    }
+
+
+                    if (array_ingredient.isEmpty()) {
+                        Toast.makeText(this, "Please add ingredients", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Log.e("All ingredients : ", String.valueOf(array_ingredient));
+                    }
                         Message("Added!");
                         Intent intentNewRecipe = new Intent(AddRecipe.this, MainActivity.class);
                         startActivity(intentNewRecipe);
                         return true;
                     }
-            case R.id.home:
-                onBackPressed();
+            case R.id.homeAsUp:
+                Intent intent = new Intent(this, MainActivity.class);
+                startActivity(intent);
                 }
 
         return super.onOptionsItemSelected(item);

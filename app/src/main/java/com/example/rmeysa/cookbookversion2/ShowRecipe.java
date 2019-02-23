@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
@@ -18,14 +19,18 @@ import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Base64;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ImageButton;
+
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -41,6 +46,7 @@ import java.util.Locale;
 public class ShowRecipe extends AppCompatActivity {
     DatabaseHelper db;
     List<Recipe> recipeList;
+    List<Ingredient> ingredientList;
     TextView edit_text_input;
     private TextView textview_timer;
     private Button button_start;
@@ -58,6 +64,12 @@ public class ShowRecipe extends AppCompatActivity {
     Uri selectedImageUri;
     Bitmap bitmap;
 
+    private ListIngredientsAdapter listIngredientsAdapter;
+    private ListView listview_ing;
+    private Cursor cursorIngredients;
+    private ArrayList<String> ingredientsArray = new ArrayList<String>();
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,11 +81,16 @@ public class ShowRecipe extends AppCompatActivity {
 
         recipeList = new ArrayList<>();
         recipeList = db.getAllRecipeList();
+        ingredientList = new ArrayList<>();
+        ingredientList = db.getAllIngredients();
         recipeImageView = (ImageView) findViewById(R.id.recipeImageView);
 
         final Bundle bundle = getIntent().getExtras();
         final int key_from_bundle = Integer.parseInt(bundle.getString("recipe_id"));
 
+        int recID = recipeList.get(key_from_bundle-1).getRecipe_id();
+
+        getIngredients(recID);
 
         //Updating textViews
         TextView recipe_name_text = (TextView) findViewById(R.id.recipe_name_text);
@@ -88,7 +105,6 @@ public class ShowRecipe extends AppCompatActivity {
 
         Timer();
 
-
     }
     public void camera() {
         InputStream inputStream = null;
@@ -98,12 +114,11 @@ public class ShowRecipe extends AppCompatActivity {
                 inputStream = getContentResolver().openInputStream(selectedImageUri);
                 bitmap = BitmapFactory.decodeStream(inputStream);
                 recipeImageView.setImageBitmap(bitmap);
+                recipeImageView.setRotation(90);
             }
             else{
 
             }
-
-
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -129,8 +144,36 @@ public class ShowRecipe extends AppCompatActivity {
                 createAlert(recipeList.get(key_from_bundle-1).getRecipe_id());
                 break;
         }
-
         return super.onOptionsItemSelected(item);
+    }
+    public void getIngredients(int recId) {
+
+        listIngredientsAdapter = new ListIngredientsAdapter(getApplicationContext(),
+                R.layout.activity_show_recipe);
+        listview_ing = (ListView) findViewById(R.id.listview_ing);
+        db = new DatabaseHelper(this);
+
+        cursorIngredients = db.getRecipeDetailIngredients(recId);
+        String ingredientsName;
+        if (cursorIngredients.moveToFirst()) {
+            do {
+
+                ingredientsName = cursorIngredients.getString(0);
+                Ingredient ingredients = new Ingredient(ingredientsName);
+                listIngredientsAdapter.add(ingredients);
+                String list = ingredients.getIngredientName();
+                ingredientsArray.add(list);
+            } while (cursorIngredients.moveToNext());
+        }
+
+        if (ingredientsArray.isEmpty()) {
+            ingredientsArray.add("didnt added");
+
+        }
+
+        listview_ing.setAdapter(new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_multiple_choice, ingredientsArray));
+
     }
     public void Timer() {
 
@@ -203,7 +246,6 @@ public class ShowRecipe extends AppCompatActivity {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-
                 thePlayer.start();
 
             }

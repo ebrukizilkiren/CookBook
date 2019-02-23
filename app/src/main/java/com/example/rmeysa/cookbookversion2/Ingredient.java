@@ -1,23 +1,24 @@
 package com.example.rmeysa.cookbookversion2;
 
 public class Ingredient {
-    private int recipeId,ingredientId;
+    private static int recipeId;
+    private int ingredientId;
     private String ingredientName;
-    private boolean checkValue;
-
     public Ingredient(){
 
     }
+    public Ingredient(String ingredientName){
+        this.ingredientName = ingredientName;
+    }
 
-    public Ingredient(int recipeId, int ingredientId, String ingredientName){
+    public Ingredient(int ingredientId, String ingredientName,int recipeId){
         this.ingredientId = ingredientId;
         this.ingredientName = ingredientName;
         this.recipeId = recipeId;
-        this.checkValue = false;
     }
 
 
-    public int getRecipeId() {
+    public static int getRecipeId() {
         return recipeId;
     }
 
@@ -41,11 +42,4 @@ public class Ingredient {
         this.ingredientName = ingredientName;
     }
 
-    public boolean isChecked() {
-        return checkValue;
-    }
-
-    public void setCheckValue(boolean checkValue) {
-        this.checkValue = checkValue;
-    }
 }
